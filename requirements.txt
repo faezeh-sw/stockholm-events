@@ -1,0 +1,8 @@
+requests>=2.32
+beautifulsoup4>=4.12
+python-dateutil>=2.9
+rapidfuzz>=3.9
+anthropic>=0.40
+pyyaml>=6.0
+tzdata
+pytest>=8.0

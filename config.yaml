@@ -1,0 +1,39 @@
+window_days: 30          # how far ahead we look
+timezone: Europe/Stockholm
+db_path: data/events.sqlite
+site_url: ""             # public web page / calendar feed link shown in posts (set once GitHub Pages is live)
+
+sources:
+  luma:
+    enabled: true
+  eventbrite:
+    enabled: true
+    detail: true         # fetch each new event page for start time / price
+    max_pages: 40
+  ticketmaster:
+    enabled: true        # needs TICKETMASTER_API_KEY
+  tickster:
+    enabled: true
+    max_urls: 6000
+    workers: 16
+    time_budget_s: 1500  # a first run may need several runs to fill the cache
+  visitstockholm:
+    enabled: true
+  jsonld_pages:
+    pages:
+      - {name: stockholmlive, url: "https://stockholmlive.com/en/events/", naive_time: true, area: Stockholm,
+         venue_by_domain: {aviciiarena.se: "Avicii Arena", sodrateatern.com: "Södra Teatern", annexet.se: "Annexet",
+                           hovetarena.se: "Hovet", strawberryarena.se: "Strawberry Arena", 3arena.se: "3Arena"}}
+  sitemap_jsonld:
+    sites:
+      - {name: sodrateatern, sitemap: "https://sodrateatern.com/robots.txt", include: "/evenemang/", venue: "Södra Teatern", area: Stockholm, cache_hours: 24}
+  # LLM-read venue calendars (need ANTHROPIC_API_KEY). Pages that only render with JavaScript
+  # (Kulturhuset, Fotografiska, Nobel, libraries) need a headless browser: see backlog in README.
+  llm_pages:
+    enabled: true
+    pages:
+      - {name: konserthuset, url: "https://www.konserthuset.se/program-och-biljetter/kalender/", venue: "Konserthuset", category: music}
+      - {name: dramaten, url: "https://www.dramaten.se/repertoar/", venue: "Dramaten", category: theatre}
+      - {name: debaser, url: "https://debaser.se/", venue: "Debaser", category: music}
+      - {name: skansen, url: "https://www.skansen.se/en/calendar/", venue: "Skansen", area: Djurgården}
+      - {name: bonniers, url: "https://bonnierskonsthall.se/en/", venue: "Bonniers Konsthall", category: art}

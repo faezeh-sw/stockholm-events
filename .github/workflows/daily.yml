@@ -1,0 +1,64 @@
+name: events
+
+on:
+  schedule:
+    - cron: "30 5 * * *"      # every day 05:30 UTC (06:30/07:30 Stockholm): refresh data; post only on Mondays
+  workflow_dispatch:
+    inputs:
+      post:
+        description: "What to post (weekly, none)"
+        default: "none"
+      dry_run:
+        description: "Dry run (print only)"
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: events
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
+      TELEGRAM_THREAD_FUN: ${{ secrets.TELEGRAM_THREAD_FUN }}
+      TELEGRAM_THREAD_PROFESSIONAL: ${{ secrets.TELEGRAM_THREAD_PROFESSIONAL }}
+      TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Restore state (SQLite lives on the orphan "state" branch)
+        run: bash scripts/state_pull.sh
+
+      - name: Collect
+        run: python -m sthlm.cli collect
+
+      - name: Post the weekly plan (Mondays, or when started by hand)
+        run: |
+          KIND="${{ github.event.inputs.post }}"
+          if [ -z "$KIND" ] || [ "$KIND" = "none" ]; then
+            if [ "$(TZ=Europe/Stockholm date +%u)" = "1" ] && [ "${{ github.event_name }}" = "schedule" ]; then KIND=weekly; else KIND=none; fi
+          fi
+          DRY=""
+          [ "${{ github.event.inputs.dry_run }}" = "true" ] && DRY="--dry-run"
+          if [ "$KIND" != "none" ]; then python -m sthlm.cli post "$KIND" $DRY; else echo "no post today"; fi
+
+      - name: Health report
+        if: always()
+        run: python -m sthlm.cli report --send || true
+
+      - name: Save state
+        if: always()
+        run: bash scripts/state_push.sh
