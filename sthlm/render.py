@@ -175,18 +175,28 @@ def next_week_start(today):
     return today + timedelta(days=7 - today.weekday())
 
 
-def weekly(merged: list[Merged], now: datetime, site_url: str = "") -> list[str]:
-    """Everything happening next Monday-Sunday: one opening line, then every day in full."""
+FUN_PER_DAY = 25      # the Fun topic lists free events only; if a day still has more, the best-ranked 25 are shown
+
+
+def weekly(merged: list[Merged], now: datetime, site_url: str = "", audience: str = "professional") -> list[str]:
+    """Everything happening next Monday-Sunday: one opening line, then every day in full.
+
+    Professional: every event, free or paid. Fun: free events only, best-ranked first when a day is crowded."""
     today = now.astimezone(TZ).date()
     mon = next_week_start(today)
     days = [mon + timedelta(days=i) for i in range(7)]
-    day_msgs = digest(merged, days, today, per_day=80, site_url=site_url)
+    if audience == "fun":
+        merged = [m for m in merged if cost_of(m.event, {src for src, _ in m.sources}) == "free"]
+    day_msgs = digest(merged, days, today, per_day=FUN_PER_DAY if audience == "fun" else 80, site_url=site_url)
     if not day_msgs:
         return []
     sun = days[-1]
     span = (f"{mon.day}–{sun.day} {mon.strftime('%B').upper()}" if mon.month == sun.month
             else f"{mon.day} {mon.strftime('%B').upper()} – {sun.day} {sun.strftime('%B').upper()}")
-    intro = f"🗓 <b>WEEK AHEAD · {span}</b>\n<i>Everything we found, day by day. Plan your week.</i>"
+    if audience == "fun":
+        intro = f"🗓 <b>FREE EVENTS · {span}</b>\n<i>Free things to do this week, day by day.</i>"
+    else:
+        intro = f"🗓 <b>WEEK AHEAD · {span}</b>\n<i>Every professional, career and networking event we found.</i>"
     return [intro] + day_msgs
 
 
@@ -206,6 +216,10 @@ Every event is written exactly the same way, so you always know where to look:
 🗣 English · Swedish · English &amp; Swedish · Other language
 🗣 No language needed (concerts, exhibitions, sports, club nights)
 🗣 Language: see event page (we could not tell)
+
+<b>What is listed where</b>
+💼 Professional &amp; Career: every event we find, free or paid.
+🎉 Fun &amp; Entertainment: free events only.
 
 <b>How it is organised</b>
 Every Monday we post the whole coming week, one day at a time. Inside each day events are grouped by category and sorted by time.

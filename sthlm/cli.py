@@ -154,7 +154,7 @@ def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str 
     key = now.date().isoformat() if kind == "daily" else render.next_week_start(now.date()).isoformat()
     for audience, banner in AUDIENCES.items():
         mine = [m for m in merged if m.event.extra.get("audience", "fun") == audience]
-        msgs = build(mine, now, site)
+        msgs = build(mine, now, site, audience=audience) if kind == "weekly" else build(mine, now, site)
         if not msgs:
             print(f"{audience}: nothing to post")
             continue

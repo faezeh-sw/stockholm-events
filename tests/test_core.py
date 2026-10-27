@@ -208,3 +208,19 @@ def test_held_in_stockholm_rejects_other_cities_and_unknown_on_strict_pages():
     assert not held_in_stockholm(bangkok) and held_in_stockholm(sthlm)
     assert held_in_stockholm(nowhere) and not held_in_stockholm(nowhere, strict=True)
     assert held_in_stockholm(coords, strict=True) and not held_in_stockholm(far)
+
+
+def test_fun_weekly_lists_only_free_events_and_professional_lists_all():
+    from sthlm.dedupe import Merged
+    now = datetime(2026, 11, 2, 7, 0, tzinfo=TZ)
+    day = datetime(2026, 11, 10, 18, 0, tzinfo=TZ)
+    free = ev("Free concert", day=day, venue="V", category="music", is_free=True)
+    paid = ev("Paid concert", day=day, venue="V", category="music", price_text="from 300 kr")
+    unknown = ev("Mystery", day=day, venue="V", category="music", source="meetup")
+    ms = [Merged(e, [(e.source, "u")]) for e in (free, paid, unknown)]
+    for m in ms:
+        m.event.extra["score"] = 5
+    fun = " ".join(render.weekly(ms, now, audience="fun"))
+    pro = " ".join(render.weekly(ms, now, audience="professional"))
+    assert "Free concert" in fun and "Paid concert" not in fun and "Mystery" not in fun and "FREE EVENTS" in fun
+    assert "Free concert" in pro and "Paid concert" in pro and "Mystery" in pro and "WEEK AHEAD" in pro

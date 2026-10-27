@@ -6,6 +6,8 @@ site_url: ""             # public web page / calendar feed link shown in posts (
 sources:
   luma:
     enabled: true
+    # organiser calendars to follow in addition to the ones seen on Luma's Stockholm Discover page
+    calendars: [nuttyventures, norrsken, nordictechweek, epicenter, startupgrindstockholm, stockholmai, founderslive]
   meetup:
     enabled: true
     radius_km: 35

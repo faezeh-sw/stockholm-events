@@ -17,6 +17,12 @@ TOURIST = re.compile(r"pub crawl|scavenger hunt|escape game|walking tour|guided 
                      r"stockholm: .*(tour|cruise|entry)|nightlife tour|club crawl|bar crawl|city tour|bus tour|boat tour|ghost walk|segway", re.I)
 
 
+# Sources that are institutions, chambers, universities, big venues and the city guide: a well-known organiser.
+REPUTABLE = {"visitstockholm", "ticketmaster", "stockholmlive", "konserthuset", "dramaten", "skansen", "bonniers",
+             "kth_calendar", "sse_site", "scilifelab", "handelskammare", "amcham", "swisscham", "sbr_business_events",
+             "kistasciencecity", "stockholmsmassan", "kistamassan", "su_kalender", "su_career", "norrsken"}
+
+
 def keep(ev: Event) -> bool:
     return not ev.online and in_stockholm(ev) and bool(ev.title.strip())
 
@@ -50,6 +56,12 @@ def build(store, since, until, enrich: bool = True, strict: bool = False) -> lis
         if m.event.extra.get("audience_hint"):          # organisers we know are professional/career
             m.event.extra["audience"] = m.event.extra["audience_hint"]
         m.event.extra["n_sources"] = len({s for s, _ in m.sources})
+        bonus = 0.0
+        if m.event.extra.get("curated"):
+            bonus += 1.5                                   # picked by the city's official guide
+        if {s for s, _ in m.sources} & REPUTABLE:
+            bonus += 1.0                                   # published by a well-known institution or venue
+        m.event.extra["score"] = min(10, m.event.extra.get("score", 3) + bonus)
         if m.event.extra["n_sources"] > 1:
             m.event.extra["score"] = min(10, m.event.extra.get("score", 3) + 0.7)
         if m.event.extra.get("tourist"):
