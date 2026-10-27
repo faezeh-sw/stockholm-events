@@ -22,6 +22,12 @@ QUERY = """query($filter: EventSearchFilter!, $first: Int, $after: String) {
   }
 }"""
 
+GROUP_QUERY = """query($u: String!, $after: DateTime) {
+  groupByUrlname(urlname: $u) { name events(status: ACTIVE, first: 40, filter: {afterDateTime: $after}) {
+    edges { node { id title eventUrl dateTime endTime isOnline eventType status description
+      venue { name address city lat lon } group { name urlname } feeSettings { amount currency }
+      featuredEventPhoto { highResUrl } } } } } }"""
+
 DEFAULT_KEYWORDS = [
     "tech", "startup", "AI", "developer", "data", "product", "design", "marketing", "career", "networking", "business",
     "finance", "founders", "leadership", "cloud", "security", "engineering", "sales", "women", "entrepreneur",
@@ -60,6 +66,22 @@ class Meetup(Collector):
                     break
                 after = es["pageInfo"]["endCursor"]
             log.debug("meetup %r: %d new", kw, n_new)
+
+        # groups named in the config are followed directly, so none of their events can be missed
+        for urlname in self.cfg.get("groups", []):
+            try:
+                data = self.http.post(API, json={"query": GROUP_QUERY, "variables": {"u": urlname, "after": self.start.isoformat()}}).json()
+                grp = (data.get("data") or {}).get("groupByUrlname")
+                if not grp:
+                    log.warning("meetup group %r not found", urlname)
+                    continue
+                for edge in grp["events"]["edges"]:
+                    ev = self._to_event(edge["node"])
+                    if ev and ev.source_id not in seen:
+                        seen.add(ev.source_id)
+                        yield ev
+            except Exception as exc:
+                log.warning("meetup group %r: %s", urlname, exc)
 
     def _to_event(self, n: dict) -> Event | None:
         if n.get("isOnline") or n.get("eventType") == "ONLINE" or n.get("status") not in (None, "ACTIVE", "PUBLISHED"):

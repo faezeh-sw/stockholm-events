@@ -6,3 +6,4 @@ anthropic>=0.40
 pyyaml>=6.0
 tzdata
 pytest>=8.0
+playwright>=1.47

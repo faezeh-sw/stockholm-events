@@ -1,5 +1,6 @@
 from .collectors.discovery import Discovery
 from .collectors.eventbrite import Eventbrite
+from .collectors.ics_feeds import IcsFeeds
 from .collectors.jsonld_pages import JsonLdPages
 from .collectors.llm_pages import LlmPages
 from .collectors.luma import Luma
@@ -10,7 +11,7 @@ from .collectors.tickster import Tickster
 from .collectors.visitstockholm import VisitStockholm
 
 COLLECTORS = {c.name: c for c in (Eventbrite, Luma, Meetup, Ticketmaster, Tickster, VisitStockholm, Discovery)}
-GENERIC = {"jsonld_pages": JsonLdPages, "sitemap_jsonld": SitemapJsonLd, "llm_pages": LlmPages}
+GENERIC = {"ics_feeds": IcsFeeds, "jsonld_pages": JsonLdPages, "sitemap_jsonld": SitemapJsonLd, "llm_pages": LlmPages}
 
 
 def priorities() -> dict[str, int]:

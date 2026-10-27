@@ -224,3 +224,30 @@ def test_fun_weekly_lists_only_free_events_and_professional_lists_all():
     pro = " ".join(render.weekly(ms, now, audience="professional"))
     assert "Free concert" in fun and "Paid concert" not in fun and "Mystery" not in fun and "FREE EVENTS" in fun
     assert "Free concert" in pro and "Paid concert" in pro and "Mystery" in pro and "WEEK AHEAD" in pro
+
+
+def test_ics_parsing_folding_timezones_and_cancelled():
+    from sthlm.collectors.ics_feeds import IcsFeeds, parse_ics
+    text = ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:1\r\nSUMMARY:AI Meetup\, Stockholm\r\nDTSTART;TZID=Europe/Stockholm:20261105T180000\r\n"
+            "DTEND;TZID=Europe/Stockholm:20261105T200000\r\nLOCATION:Epicenter\, Regeringsgatan 65\, Stockholm\r\n"
+            "DESCRIPTION:Line one\r\n  continued\r\nURL:https://x.se/e1\r\nEND:VEVENT\r\n"
+            "BEGIN:VEVENT\r\nUID:2\r\nSUMMARY:Day event\r\nDTSTART;VALUE=DATE:20261106\r\nSTATUS:CANCELLED\r\nEND:VEVENT\r\n"
+            "BEGIN:VEVENT\r\nUID:3\r\nSUMMARY:UTC event\r\nDTSTART:20261107T170000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    evs = [IcsFeeds._to_event(r, {"name": "t", "url": "https://x.se"}) for r in parse_ics(text)]
+    a, cancelled, c = evs
+    assert a.title == "AI Meetup, Stockholm" and a.time_known and a.start.hour == 18 and a.url == "https://x.se/e1"
+    assert "continued" in a.description and a.venue == "Epicenter"
+    assert cancelled is None
+    assert c.start.hour == 18 and c.start.day == 7          # 17:00 UTC is 18:00 in Stockholm in November
+
+
+def test_render_pages_are_skipped_cleanly_when_no_browser(monkeypatch):
+    from sthlm import browser
+    from sthlm.collectors.llm_pages import LlmPages
+
+    def no_browser(url, wait_ms=0):
+        raise browser.BrowserUnavailable("no playwright")
+    monkeypatch.setattr(browser, "render_html", no_browser)
+    win = (datetime(2026, 10, 27, tzinfo=TZ), datetime(2026, 11, 26, tzinfo=TZ))
+    c = LlmPages({"pages": [{"name": "js", "url": "https://js.example/events", "render": True}]}, None, win, set(), None, client=object())
+    assert list(c.fetch()) == []                       # logged and skipped, no crash

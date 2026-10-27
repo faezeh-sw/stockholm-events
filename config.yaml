@@ -7,9 +7,11 @@ sources:
   luma:
     enabled: true
     # organiser calendars to follow in addition to the ones seen on Luma's Stockholm Discover page
-    calendars: [nuttyventures, norrsken, nordictechweek, epicenter, startupgrindstockholm, stockholmai, founderslive]
+    calendars: [nuttyventures, norrsken, nordictechweek, stockholmdesign, founderslive]
   meetup:
     enabled: true
+    groups: [aws-stockholm, producttank-stockholm, pyladiesstockholm, owasp-stockholm, stockholm-ai-safety, avanza-tech-meet-up,
+             hiq-tech-meetup, microsoft-reactor-stockholm, spotify, sthlm-tech-meetup, geekgirlmeetup]
     radius_km: 35
     max_pages: 4
   discovery:
@@ -32,11 +34,21 @@ sources:
     time_budget_s: 1500  # a first run may need several runs to fill the cache
   visitstockholm:
     enabled: true
+  ics_feeds:                       # iCal feeds: exact, free, no LLM
+    feeds:
+      - {name: startskott, url: "https://startskott.com/kalender.ics", audience: professional, category: tech, city: Stockholm}
+      - {name: startskott_ai, url: "https://startskott.com/kalender/ai-event-stockholm.ics", audience: professional, category: tech, city: Stockholm}
+      - {name: aieventlist, url: "https://aieventlist.ai/cities/stockholm/events.ics", audience: professional, category: tech, city: Stockholm}
+      - {name: hyperight_ics, url: "https://hyperight.com/events/?ical=1", audience: professional, category: tech, city: Stockholm}
   jsonld_pages:
     pages:
       - {name: devevents_conf, url: "https://dev.events/EU/SE/Stockholm", audience: professional, category: tech, area: Stockholm}
       - {name: devevents_tech, url: "https://dev.events/EU/SE/Stockholm/tech", audience: professional, category: tech, area: Stockholm}
       - {name: devevents_it, url: "https://dev.events/EU/SE/Stockholm/it", audience: professional, category: tech, area: Stockholm}
+      - {name: databricks_stockholm_user_gr, url: "https://usergroups.databricks.com/events/details/databricks-user-groups-stockholm-databricks-user-group-presents-building-trustworthy-ai-applications-with-genie/", audience: professional, city: Stockholm}
+      - {name: techarena_2027, url: "https://techarena.se/", audience: professional}
+      - {name: nordic_data_science_ml_summi, url: "https://hyperight.com/event/nordic-data-science-and-machine-learning-summit-2026-stockholm/", audience: professional, city: Stockholm}
+      - {name: data_ai_stockholm_summit, url: "https://dataaistockholm.com/summit", audience: professional}
       - {name: hackerx, url: "https://hackerx.org/events/", audience: professional, category: business, city: Stockholm}
       - {name: stockholmlive, url: "https://stockholmlive.com/en/events/", naive_time: true, area: Stockholm,
          venue_by_domain: {aviciiarena.se: "Avicii Arena", sodrateatern.com: "Södra Teatern", annexet.se: "Annexet",
@@ -80,6 +92,59 @@ sources:
       - {name: almi_kalender, url: "https://www.almi.se/kunskap-och-inspiration/kalender/", audience: professional, category: business, city: Stockholm}
       - {name: su_kalender, url: "https://www.su.se/kalender", audience: professional, category: talk, city: Stockholm}
       - {name: aitinkerers, url: "https://stockholm.aitinkerers.org/", audience: professional, category: tech}
+      # ---- added from the researched source list (Stockholm_AI_Tech_Business_Career_Event_Sources_2026.xlsx) ----
+      - {name: startskott_tech_en, url: "https://startskott.com/en/tech-events-stockholm", audience: professional}
+      - {name: startskott_ai, url: "https://startskott.com/ai-event-stockholm", audience: professional}
+      - {name: n_tverkskollen_stockholm, url: "https://natverkskollen.se/stockholm/evenemang", audience: professional, city: Stockholm}
+      - {name: n_tverkskollen_ai_stockholm, url: "https://natverkskollen.se/ai-event-stockholm", audience: professional, city: Stockholm}
+      - {name: n_tverkskollen_free_events, url: "https://natverkskollen.se/gratis-event-stockholm", audience: professional, city: Stockholm}
+      - {name: ai_events_stockholm, url: "https://www.aievents.se/en/events/", audience: professional, city: Stockholm}
+      - {name: brouky_stockholm, url: "https://brouky.tech/events/city/stockholm", audience: professional, city: Stockholm}
+      - {name: ai_event_list_stockholm, url: "https://aieventlist.ai/en/cities/stockholm/", audience: professional}
+      - {name: ai_sweden, url: "https://www.ai.se/en/events", audience: professional, city: Stockholm}
+      - {name: data_ai_stockholm, url: "https://dataaistockholm.com/", audience: professional}
+      - {name: digital_futures_at_kth, url: "https://www.digitalfutures.kth.se/events/", audience: professional, city: Stockholm}
+      - {name: gdg_web_stockholm, url: "https://gdg.community.dev/gdg-web-stockholm/", audience: professional}
+      - {name: power_platform_community_swe, url: "https://powerplatformsweden.se/", audience: professional, city: Stockholm}
+      - {name: kth_innovation_calendar, url: "https://www.kth.se/en/om/innovation/om/kalender", audience: professional}
+      - {name: connect_sverige_events, url: "https://connectsverige.se/event/", audience: professional, city: Stockholm}
+      - {name: stockholms_handelskammare, url: "https://stockholmshandelskammare.se/event/?plats=stockholm", audience: professional}
+      - {name: techsverige_calendar, url: "https://techsverige.se/kalendarium/", audience: professional, city: Stockholm}
+      - {name: developers_bay_events, url: "https://developersbay.se/sv/event", audience: professional, city: Stockholm}
+      - {name: hyperight_2, url: "https://hyperight.com/", audience: professional, city: Stockholm}
+      - {name: kista_science_city_main_hub, url: "https://kistasciencecity.com/", audience: professional}
+      - {name: microsoft_sweden_events, url: "https://pulse.microsoft.com/sv-se/microsoft-events-sweden/", audience: professional, city: Stockholm}
+      - {name: anthropic_events_stockholm_e, url: "https://www.anthropic.com/events/claude-founder-house-stockholm", audience: professional, city: Stockholm}
+      - {name: salesforce_eu_events, url: "https://www.salesforce.com/eu/events/?bc=OTH", audience: professional, city: Stockholm}
+      - {name: snowflake_events, url: "https://www.snowflake.com/en/events/all-events/", audience: professional, city: Stockholm}
+      - {name: snowflake_stockholm_world_to, url: "https://www.snowflake.com/en/world-tour/stockholm/agenda/", audience: professional, city: Stockholm}
+      - {name: ey_sweden_events, url: "https://www.ey.com/en_se/events", audience: professional, city: Stockholm}
+      - {name: stockholm_university_maths_p, url: "https://www.su.se/english/divisions/department-of-mathematics/education/study-with-us/career-fair", audience: professional}
+      - {name: nackademin_it_industry_days, url: "https://nackademin.se/branschdagar/it/", audience: professional, city: Stockholm}
+      - {name: nackademin_events, url: "https://nackademin.se/event/", audience: professional, city: Stockholm}
+      - {name: sse_finance_career_fair, url: "https://www.hhs.se/events/sse/2026/finance-career-fair-2026/", audience: professional}
+      - {name: sse_student_fair_security_ca, url: "https://www.hhs.se/news/cfsr/2026/student-fair-16th-of-november-2026/", audience: professional}
+      - {name: kollin_career_fair_directory, url: "https://kollin.io/events", audience: professional, city: Stockholm}
+      - {name: women_in_tech_sweden_events, url: "https://womenintech.se/events/", audience: professional, city: Stockholm}
+      - {name: stockholm_tech_show, url: "https://www.stockholmtechshow.se/", audience: professional}
+      - {name: devsum, url: "https://www.devsum.se/", audience: professional}
+      - {name: nordic_ai_factory_summit, url: "https://nordicaifactorysummit.com/", audience: professional, city: Stockholm}
+      - {name: stockholm_business_tech, url: "https://www.stockholmbusinesstech.se/", audience: professional}
+      - {name: kistam_ssan_calendar, url: "https://www.kistamassan.se/calendar/", audience: professional}
+      - {name: women_in_tech_sweden, url: "https://womenintech.se/", audience: professional, city: Stockholm}
+      - {name: kth_karriar_kalender, url: "https://www.kth.se/en/student/stod/jobb-och-framtid/karriar/kalender", audience: professional, category: business}
+      - {name: su_evenemang, url: "https://www.su.se/evenemang", audience: professional, category: talk}
+      # ---- JavaScript-only pages: read with a headless browser (needs Playwright; installed on GitHub Actions) ----
+      - {name: norrsken_events_js, url: "https://www.norrsken.org/events", render: true, audience: professional, category: tech, city: Stockholm}
+      - {name: breakit_events, url: "https://www.breakit.se/event", render: true, audience: professional, category: business}
+      - {name: sting_events, url: "https://events.sting.co/", render: true, audience: professional, category: tech}
+      - {name: stockholm_mlops, url: "https://www.stockholmmlops.se/events", render: true, audience: professional, category: tech}
+      - {name: kth_ai_society, url: "https://kthais.com/events", render: true, audience: professional, category: tech}
+      - {name: women_in_ai_sweden, url: "https://womeninaisweden.com/events", render: true, audience: professional, category: tech}
+      - {name: tech_social_stockholm, url: "https://techsocialstockholm.com/events", render: true, audience: professional, category: community}
+      - {name: impact_hub_stockholm, url: "https://impacthubstockholm.com/aktuellt", render: true, audience: professional, category: business}
+      - {name: armada_career_fair, url: "https://armada.nu/", render: true, audience: professional, category: business}
+      - {name: d_dagen, url: "https://ddagen.se/en/event", render: true, audience: professional, category: business}
       # ---- big companies' global event pages, filtered to Stockholm ----
       - {name: aws_events, url: "https://aws.amazon.com/events/", audience: professional, category: tech, city: Stockholm}
       - {name: google_cloud_events, url: "https://cloud.google.com/events", audience: professional, category: tech, city: Stockholm}

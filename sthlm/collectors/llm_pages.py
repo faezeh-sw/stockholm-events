@@ -19,6 +19,7 @@ from .. import usage
 from ..models import Event, TZ
 from ..parse import clean_text, is_event_type, jsonld_objects, parse_dt
 from .base import Collector, event_from_jsonld
+from .. import browser
 from ..geo import held_in_stockholm
 from .tickster import CITIES
 
@@ -93,7 +94,10 @@ class LlmPages(Collector):
         for page in self.cfg["pages"]:
             for url in page.get("urls") or [page["url"]]:
                 try:
-                    html = self.http.get(url).text
+                    html = browser.render_html(url) if page.get("render") else self.http.get(url).text
+                except browser.BrowserUnavailable as exc:
+                    log.warning("%s needs a browser: %s", url, exc)
+                    continue
                 except Exception as exc:
                     log.warning("%s: %s", url, exc)
                     continue
