@@ -5,6 +5,7 @@ import re
 from urllib.parse import urlparse
 
 from ..parse import is_event_type, jsonld_objects, parse_dt
+from ..geo import held_in_stockholm
 from .base import Collector, event_from_jsonld
 
 log = logging.getLogger(__name__)
@@ -37,8 +38,14 @@ class JsonLdPages(Collector):
                         ev.start, ev.time_known = dt, known
                 if not self.in_window(ev.start):
                     continue
+                if not held_in_stockholm(ev, strict=bool(page.get("city"))):
+                    continue
+                if ev.online:
+                    continue
                 host = urlparse(ev.url).netloc.removeprefix("www.")
                 ev.venue = ev.venue or page.get("venue_by_domain", {}).get(host, "") or page.get("venue", "")
                 ev.area = ev.area or page.get("area", "")
                 ev.category = page.get("category", "")
+                if page.get("audience"):
+                    ev.extra["audience_hint"] = page["audience"]
                 yield ev

@@ -21,21 +21,34 @@ def keep(ev: Event) -> bool:
     return not ev.online and in_stockholm(ev) and bool(ev.title.strip())
 
 
-def build(store, since, until, enrich: bool = True) -> list[Merged]:
+class EnrichmentIncomplete(RuntimeError):
+    pass
+
+
+def build(store, since, until, enrich: bool = True, strict: bool = False) -> list[Merged]:
     events = [e for e in store.load_events(since, until) if keep(e)]
     for e in events:
         label_area(e)
+        if re.search(r"inställt|inställd|cancell?ed|avbokad", e.title, re.I):
+            e.cancelled = True
         if TOURIST.search(e.title):
             e.extra["tourist"] = True
     merged = merge(events, priorities())
     log.info("catalog: %d raw -> %d unique", len(events), len(merged))
     if enrich:
-        make_enricher().enrich([m.event for m in merged], store)
+        enricher = make_enricher()
+        enricher.enrich([m.event for m in merged], store)
+        bad = getattr(enricher, "unresolved", 0)
+        if strict and (bad or not hasattr(enricher, "unresolved")):
+            raise EnrichmentIncomplete(
+                f"{bad} events could not be translated/classified: {getattr(enricher, 'last_error', 'no ANTHROPIC_API_KEY')}")
     else:
         from .enrich import RuleEnricher
         RuleEnricher().enrich([m.event for m in merged], store)
     merged = [m for m in merged if not m.event.extra.get("skip")]
     for m in merged:
+        if m.event.extra.get("audience_hint"):          # organisers we know are professional/career
+            m.event.extra["audience"] = m.event.extra["audience_hint"]
         m.event.extra["n_sources"] = len({s for s, _ in m.sources})
         if m.event.extra["n_sources"] > 1:
             m.event.extra["score"] = min(10, m.event.extra.get("score", 3) + 0.7)

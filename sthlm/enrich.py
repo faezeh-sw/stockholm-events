@@ -11,6 +11,7 @@ import logging
 import os
 import re
 
+from . import usage
 from .models import CATEGORIES, Event
 
 log = logging.getLogger(__name__)
@@ -115,6 +116,8 @@ class LLMEnricher(RuleEnricher):
     def __init__(self):
         import anthropic
         self.client = anthropic.Anthropic()
+        self.unresolved = 0          # events that could not be processed (API error, no credit...)
+        self.last_error = ""
 
     def enrich(self, events: list[Event], store) -> None:
         super().enrich(events, store)
@@ -133,6 +136,7 @@ class LLMEnricher(RuleEnricher):
             try:
                 return self._call(chunk)
             except Exception as exc:
+                self.last_error = str(exc)[:200]
                 if len(chunk) == 1:
                     log.error("LLM enrichment failed for %r: %s", chunk[0].title, exc)
                     return [None]
@@ -144,6 +148,7 @@ class LLMEnricher(RuleEnricher):
             for chunk, results in zip(chunks, pool.map(run, chunks)):
                 for ev, res in zip(chunk, results):
                     if res is None:
+                        self.unresolved += 1
                         continue
                     store.put_enrich(text_key(ev), res)
                     self._apply(ev, res)
@@ -159,9 +164,10 @@ class LLMEnricher(RuleEnricher):
 
         need = []
         for ev in events:
-            unknown_lang = ev.lang in ("", "unknown")
+            # reading an event page costs tokens: only for the audience we care most about, and only for the language
+            professional = (ev.extra.get("audience_hint") or ev.extra.get("audience")) == "professional"
             unknown_cost = not ev.price_text and not ev.is_free and ev.extra.get("cost") in (None, "unknown")
-            if not (unknown_lang or unknown_cost):
+            if not (professional and (ev.lang in ("", "unknown") or unknown_cost)):
                 continue
             key = text_key(ev) + "|deep"
             cached = store.get_enrich(key)
@@ -183,7 +189,7 @@ class LLMEnricher(RuleEnricher):
 
         with ThreadPoolExecutor(8) as pool:
             texts = list(pool.map(fetch, need))
-        work = [(ev, key, dataclasses.replace(ev, description=t)) for (ev, key), t in zip(need, texts) if len(t) > 200]
+        work = [(ev, key, dataclasses.replace(ev, description=t)) for (ev, key), t in zip(need, texts) if len(t) > 200][:150]
         for ev, key in ((ev, key) for (ev, key), t in zip(need, texts) if len(t) <= 200):
             store.put_enrich(key, {})                  # nothing readable (JS-only page): do not retry every day
         for i in range(0, len(work), 8):
@@ -221,6 +227,7 @@ class LLMEnricher(RuleEnricher):
             tools=[TOOL], tool_choice={"type": "tool", "name": TOOL["name"]},
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
+        usage.record("enrich", getattr(msg, "usage", None))
         data = next(b.input["events"] for b in msg.content if b.type == "tool_use")
         by_id = {d.get("id"): d for d in data if isinstance(d, dict)}
         return [by_id.get(i) for i in range(len(chunk))]

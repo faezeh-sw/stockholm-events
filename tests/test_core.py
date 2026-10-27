@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 
 from sthlm import render
@@ -104,7 +105,7 @@ def test_llm_pages_extraction_with_mock():
     reply = _json.dumps([{"title": "Opera Gala", "start": "2026-11-28T19:00", "end": None, "url": "https://venue.se/e/1",
                           "price": "Free", "description": "Gala"}, {"title": "Broken", "start": None}])
     client = SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: SimpleNamespace(
-        content=[SimpleNamespace(type="text", text="```json\n" + reply + "\n```")])))
+        content=[SimpleNamespace(type="tool_use", input={"events": _json.loads(reply)})])))
     win = (datetime(2026, 10, 23, tzinfo=TZ), datetime(2026, 11, 30, tzinfo=TZ))
     c = LlmPages({"pages": []}, None, win, set(), None, client=client)
     evs = c._extract(txt, "https://venue.se/program", {"name": "venue", "venue": "Venue"})
@@ -177,3 +178,33 @@ def test_weekly_covers_next_monday_to_sunday_with_intro():
     assert msgs[0].startswith("🗓") and "9–15 NOVEMBER" in msgs[0]
     assert "E9" in text and "E15" in text and "E8" not in text and "E16" not in text and "E2<" not in text
     assert "MONDAY, 9 NOVEMBER" in text and "SUNDAY, 15 NOVEMBER" in text
+
+
+def test_discovery_accepts_only_urls_returned_by_the_search():
+    from types import SimpleNamespace as NS
+    from sthlm.collectors.discovery import Discovery, norm_url, parse_json_array
+    assert norm_url("https://www.Example.com/a/b/?x=1") == "example.com/a/b"
+    arr = parse_json_array('Here you go:\n```json\n[{"title": "A"}, {"title": "B"}]\n```')
+    assert [a["title"] for a in arr] == ["A", "B"]
+    good = {"title": "Cloud Day", "start": "2026-11-05T09:00", "url": "https://cloud.example.com/day/", "price": "Free"}
+    fake = {"title": "Invented", "start": "2026-11-05", "url": "https://nowhere.example.org/x"}
+    reply = json.dumps([good, fake])
+    result = NS(type="web_search_tool_result", content=[NS(url="https://cloud.example.com/day")])
+    msg = NS(content=[result, NS(type="text", text=reply)], stop_reason="end_turn")
+    client = NS(messages=NS(create=lambda **kw: msg))
+    win = (datetime(2026, 10, 27, tzinfo=TZ), datetime(2026, 11, 26, tzinfo=TZ))
+    d = Discovery({}, None, win, set(), None, client=client)
+    evs = d._run("q")
+    assert [e.title for e in evs] == ["Cloud Day"] and evs[0].is_free and evs[0].time_known
+
+
+def test_held_in_stockholm_rejects_other_cities_and_unknown_on_strict_pages():
+    from sthlm.geo import held_in_stockholm
+    bangkok = ev("Expo"); bangkok.area = "Bangkok"
+    sthlm = ev("Expo"); sthlm.area = "Solna"
+    nowhere = ev("Expo")
+    coords = ev("Expo", lat=59.33, lon=18.07)
+    far = ev("Expo", lat=51.5, lon=-0.12)
+    assert not held_in_stockholm(bangkok) and held_in_stockholm(sthlm)
+    assert held_in_stockholm(nowhere) and not held_in_stockholm(nowhere, strict=True)
+    assert held_in_stockholm(coords, strict=True) and not held_in_stockholm(far)

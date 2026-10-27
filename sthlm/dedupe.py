@@ -103,4 +103,6 @@ def _combine(group: list[Event]) -> Event:
         if len(other.description) > len(base.description):
             base.description = other.description
         base.cancelled = base.cancelled or other.cancelled
+        if other.extra.get("audience_hint") and not base.extra.get("audience_hint"):
+            base.extra["audience_hint"] = other.extra["audience_hint"]
     return base

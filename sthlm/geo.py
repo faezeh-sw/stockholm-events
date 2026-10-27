@@ -44,3 +44,19 @@ def in_stockholm(ev: Event) -> bool:
 def label_area(ev: Event) -> None:
     if ev.lat is not None and ev.lon is not None:
         ev.area = district(ev.lat, ev.lon)
+
+
+def held_in_stockholm(ev: Event, strict: bool = False) -> bool:
+    """Is this structured event really in Greater Stockholm?
+
+    Coordinates win. Otherwise the stated locality/address must name a Greater-Stockholm place. `strict` (multi-city
+    pages) additionally rejects events that state no place at all."""
+    from .collectors.tickster import CITIES
+    if ev.lat is not None and ev.lon is not None:
+        return km((ev.lat, ev.lon), CENTER) <= MAX_KM
+    where = f"{ev.area} {ev.address} {ev.venue}".lower()
+    if any(c in where for c in CITIES):
+        return True
+    if ev.area.strip() or ev.address.strip():
+        return False                      # it names a place, and it is not ours
+    return not strict

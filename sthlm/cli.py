@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from . import catalog, render
+from . import catalog, render, usage
 from .dedupe import merge
 from .http import Http
 from .models import TZ
@@ -49,6 +49,13 @@ def cmd_collect(cfg: dict, only: list[str] | None) -> None:
     for key, scfg in cfg["sources"].items():
         if not scfg.get("enabled", True) or (only and key not in only):
             continue
+        if scfg.get("skip_in_ci") and os.environ.get("GITHUB_ACTIONS"):
+            continue                                  # e.g. Eventbrite blocks GitHub's servers
+        every = scfg.get("min_interval_days")
+        age = store.last_ok_run_age_days(key)
+        if every and not only and age is not None and age < every:
+            print(f"-- {key:<14} skipped (last run {age:.1f} days ago, runs every {every} days)")
+            continue                                  # expensive source: its stored events stay valid until the next run
         cls = classes[key]
         t0 = time.time()
         seen: dict[str, set[str]] = {}
@@ -69,6 +76,7 @@ def cmd_collect(cfg: dict, only: list[str] | None) -> None:
         store.log_run(key, not err, count, err, time.time() - t0)
         store.commit()
         print(f"{'OK ' if not err else 'ERR'} {key:<14} {count:>5} events  {time.time() - t0:5.1f}s  {err}")
+    usage.flush(store)
 
 
 def cmd_stats(cfg: dict) -> None:
@@ -132,7 +140,16 @@ def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str 
                 except Exception as exc:          # needs the bot's "pin messages" right
                     print("  could not pin (give the bot the Pin Messages permission):", exc)
         return
-    merged = catalog.build(store, s, e, enrich=not no_llm)
+    try:
+        merged = catalog.build(store, s, e, enrich=not no_llm, strict=not (no_llm or dry))
+    except catalog.EnrichmentIncomplete as exc:
+        msg = f"🚫 Weekly post NOT sent: {exc}"
+        print(msg)
+        try:
+            Telegram.from_env(admin=True).send(msg)
+        except Exception:
+            pass
+        raise SystemExit(1)
     build = {"daily": render.daily, "weekly": render.weekly}[kind]
     key = now.date().isoformat() if kind == "daily" else render.next_week_start(now.date()).isoformat()
     for audience, banner in AUDIENCES.items():
@@ -151,6 +168,7 @@ def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str 
             # the test channel has no topics: separate the two sections with a banner message
             tg.send(banner, silent=True)
         print(stored, key, sync_messages(tg, store, stored, key, msgs))
+    usage.flush(store)
 
 
 def cmd_report(cfg: dict, send: bool) -> None:
@@ -165,6 +183,12 @@ def cmd_report(cfg: dict, send: bool) -> None:
     for r in rows:
         lines.append(f"{'✅' if r['ok'] else '❌'} {r['source']}: {r['count']} events, {r['seconds']:.0f}s"
                      + (f" — {render.esc(r['error'])}" if r["error"] else ""))
+    use = store.usage_summary(7)
+    if use:
+        lines += ["", "<b>LLM use, last 7 days</b>"]
+        for kind, tin, tout, searches, calls in use:
+            lines.append(f"• {kind}: {calls} calls, {tin or 0:,} in / {tout or 0:,} out tokens"
+                         + (f", {searches} web searches" if searches else ""))
     text = "\n".join(lines)
     if send:
         from .telegram import Telegram

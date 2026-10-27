@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS enrich (
 CREATE TABLE IF NOT EXISTS posts (
     kind TEXT, key TEXT, message_ids TEXT, content_hash TEXT, posted_at TEXT, PRIMARY KEY (kind, key)
 );
+CREATE TABLE IF NOT EXISTS usage (
+    ts TEXT, kind TEXT, in_tokens INT, out_tokens INT, searches INT, calls INT
+);
 CREATE TABLE IF NOT EXISTS source_runs (
     run_at TEXT, source TEXT, ok INT, count INT, error TEXT, seconds REAL
 );
@@ -113,6 +116,19 @@ class Store:
     # --- health -----------------------------------------------------------------------------
     def log_run(self, source: str, ok: bool, count: int, error: str, seconds: float) -> None:
         self.db.execute("INSERT INTO source_runs VALUES (?,?,?,?,?,?)", (now_iso(), source, int(ok), count, error[:500], seconds))
+
+    def log_usage(self, kind: str, in_tokens: int, out_tokens: int, searches: int, calls: int) -> None:
+        self.db.execute("INSERT INTO usage VALUES (?,?,?,?,?,?)", (now_iso(), kind, in_tokens, out_tokens, searches, calls))
+
+    def usage_summary(self, days: int = 7) -> list[tuple]:
+        return self.db.execute(
+            "SELECT kind, SUM(in_tokens), SUM(out_tokens), SUM(searches), SUM(calls) FROM usage "
+            "WHERE ts > datetime('now', ?) GROUP BY kind ORDER BY 2 DESC", (f"-{days} days",)).fetchall()
+
+    def last_ok_run_age_days(self, source: str) -> float | None:
+        r = self.db.execute("SELECT (julianday('now') - julianday(run_at)) FROM source_runs WHERE source=? AND ok=1 "
+                            "ORDER BY run_at DESC LIMIT 1", (source,)).fetchone()
+        return r[0] if r else None
 
     def last_good_count(self, source: str) -> int | None:
         r = self.db.execute("SELECT count FROM source_runs WHERE source=? AND ok=1 ORDER BY run_at DESC LIMIT 1", (source,)).fetchone()

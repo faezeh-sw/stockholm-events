@@ -6,8 +6,19 @@ site_url: ""             # public web page / calendar feed link shown in posts (
 sources:
   luma:
     enabled: true
+  meetup:
+    enabled: true
+    radius_km: 35
+    max_pages: 4
+  discovery:
+    enabled: true       # Claude web search for long-tail company/association events (costs credit)
+    min_interval_days: 7
+    cache_hours: 144
+    workers: 4
+    max_uses: 3
   eventbrite:
     enabled: true
+    skip_in_ci: true     # Eventbrite blocks GitHub's servers; run it from your own PC if wanted
     detail: true         # fetch each new event page for start time / price
     max_pages: 40
   ticketmaster:
@@ -21,6 +32,10 @@ sources:
     enabled: true
   jsonld_pages:
     pages:
+      - {name: devevents_conf, url: "https://dev.events/EU/SE/Stockholm", audience: professional, category: tech, area: Stockholm}
+      - {name: devevents_tech, url: "https://dev.events/EU/SE/Stockholm/tech", audience: professional, category: tech, area: Stockholm}
+      - {name: devevents_it, url: "https://dev.events/EU/SE/Stockholm/it", audience: professional, category: tech, area: Stockholm}
+      - {name: hackerx, url: "https://hackerx.org/events/", audience: professional, category: business, city: Stockholm}
       - {name: stockholmlive, url: "https://stockholmlive.com/en/events/", naive_time: true, area: Stockholm,
          venue_by_domain: {aviciiarena.se: "Avicii Arena", sodrateatern.com: "Södra Teatern", annexet.se: "Annexet",
                            hovetarena.se: "Hovet", strawberryarena.se: "Strawberry Arena", 3arena.se: "3Arena"}}
@@ -31,9 +46,42 @@ sources:
   # (Kulturhuset, Fotografiska, Nobel, libraries) need a headless browser: see backlog in README.
   llm_pages:
     enabled: true
+    min_interval_days: 3  # pages without schema.org markup are read by the LLM; unchanged pages are free (cached)
     pages:
       - {name: konserthuset, url: "https://www.konserthuset.se/program-och-biljetter/kalender/", venue: "Konserthuset", category: music}
       - {name: dramaten, url: "https://www.dramaten.se/repertoar/", venue: "Dramaten", category: theatre}
       - {name: debaser, url: "https://debaser.se/", venue: "Debaser", category: music}
       - {name: skansen, url: "https://www.skansen.se/en/calendar/", venue: "Skansen", area: Djurgården}
       - {name: bonniers, url: "https://bonnierskonsthall.se/en/", venue: "Bonniers Konsthall", category: art}
+      # ---- professional / career organisers (audience: professional sends them to the Professional topic) ----
+      - {name: handelskammare, url: "https://stockholmshandelskammare.se/events/", audience: professional, category: business}
+      - {name: kth_calendar, url: "https://www.kth.se/en/om/upptack/kalender", audience: professional, category: talk}
+      - {name: swisscham, url: "https://swisscham.se/events/upcoming-events/", audience: professional, category: business}
+      - {name: businesseventnetwork, url: "https://businesseventnetwork.se/kommande-natverkstraffar/", audience: professional, category: business}
+      - {name: kistasciencecity, url: "https://kistasciencecity.com/event-calendar/", audience: professional, category: tech}
+      - {name: sbr_business_events, url: "https://en.stockholmbusinessregion.se/business-events-stockholm/", audience: professional, category: business}
+      - {name: amcham, url: "https://www.amcham.se/program", audience: professional, category: business}
+      - {name: norrsken, url: "https://www.norrsken.org/events", audience: professional, category: tech}
+      - {name: sse_site, url: "https://www.hhs.se/research/institutes/site/", audience: professional, category: talk, venue: "Stockholm School of Economics"}
+      - {name: scilifelab, url: "https://www.scilifelab.se/events/", audience: professional, category: talk}
+      - {name: founderslive, url: "https://www.founderslive.com/events-list/stockholm-2026-11", audience: professional, category: tech}
+      - {name: digitalize, url: "https://digitalizeinsthlm.se/", audience: professional, category: tech}
+      - {name: hyperight, url: "https://hyperight.com/events/", audience: professional, category: tech, city: Stockholm}
+      - {name: su_career, url: "https://www.su.se/english/education/careers/career-events", audience: professional, category: business}
+      - {name: infosec_conferences, url: "https://infosec-conferences.com/country/sweden/", audience: professional, category: tech, city: Stockholm}
+      - {name: eventsforgamers, url: "https://www.eventsforgamers.com/events/?country=Sweden", audience: professional, category: tech, city: Stockholm}
+      - {name: sverigesingenjorer, url: "https://www.sverigesingenjorer.se/kalendarium/", audience: professional, category: business, city: Stockholm}
+      - {name: womenhack, url: "https://womenhack.com/events/", audience: professional, category: business, city: Stockholm}
+      - {name: handelskammer_de, url: "https://www.handelskammer.se/evenemang/", audience: professional, category: business}
+      - {name: deloitte_se, url: "https://www.deloitte.com/se/sv/our-thinking/evenemang.html", audience: professional, category: business}
+      - {name: kompetensinstitutet, url: "https://www.kompetensinstitutet.se/konferenser/", audience: professional, category: business, city: Stockholm}
+      - {name: almi_kalender, url: "https://www.almi.se/kunskap-och-inspiration/kalender/", audience: professional, category: business, city: Stockholm}
+      - {name: su_kalender, url: "https://www.su.se/kalender", audience: professional, category: talk, city: Stockholm}
+      - {name: aitinkerers, url: "https://stockholm.aitinkerers.org/", audience: professional, category: tech}
+      # ---- big companies' global event pages, filtered to Stockholm ----
+      - {name: aws_events, url: "https://aws.amazon.com/events/", audience: professional, category: tech, city: Stockholm}
+      - {name: google_cloud_events, url: "https://cloud.google.com/events", audience: professional, category: tech, city: Stockholm}
+      - {name: microsoft_events, url: "https://events.microsoft.com/", audience: professional, category: tech, city: Stockholm}
+      # ---- fair grounds: trade fairs, conferences, consumer fairs ----
+      - {name: stockholmsmassan, url: "https://stockholmsmassan.se/en/calendar/", venue: "Stockholmsmässan", area: Älvsjö}
+      - {name: kistamassan, url: "https://www.kistamassan.se/en/calendar/", venue: "Kistamässan", area: Kista}

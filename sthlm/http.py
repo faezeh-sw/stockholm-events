@@ -35,6 +35,12 @@ class Http:
 
     def get(self, url: str, delay: float | None = None, **kw) -> requests.Response:
         """GET with a global rate limit (one request slot every `delay` seconds, across threads)."""
+        return self._request("get", url, delay, **kw)
+
+    def post(self, url: str, delay: float | None = None, **kw) -> requests.Response:
+        return self._request("post", url, delay, **kw)
+
+    def _request(self, method: str, url: str, delay: float | None, **kw) -> requests.Response:
         d = self.delay if delay is None else delay
         with self._lock:
             slot = max(time.monotonic(), self._next)
@@ -43,6 +49,6 @@ class Http:
         if wait > 0:
             time.sleep(wait)
         kw.setdefault("timeout", self.timeout)
-        r = self.s.get(url, **kw)
+        r = getattr(self.s, method)(url, **kw)
         r.raise_for_status()
         return r
