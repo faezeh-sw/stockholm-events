@@ -1,6 +1,10 @@
 window_days: 30          # how far ahead we look
 timezone: Europe/Stockholm
 db_path: data/events.sqlite
+telegram:                  # ids are not secrets (the bot token is); keeping them here avoids GitHub masking digits in logs
+  group_id: -1004313675946
+  thread_fun: 2
+  thread_professional: 3
 site_url: ""             # public web page / calendar feed link shown in posts (set once GitHub Pages is live)
 
 sources:

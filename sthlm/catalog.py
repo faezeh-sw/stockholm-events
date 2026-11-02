@@ -31,6 +31,9 @@ class EnrichmentIncomplete(RuntimeError):
     pass
 
 
+LAST_UNRESOLVED = 0      # events the last build could not translate (posted with their original text)
+
+
 def build(store, since, until, enrich: bool = True, strict: bool = False) -> list[Merged]:
     events = [e for e in store.load_events(since, until) if keep(e)]
     for e in events:
@@ -44,10 +47,16 @@ def build(store, since, until, enrich: bool = True, strict: bool = False) -> lis
     if enrich:
         enricher = make_enricher()
         enricher.enrich([m.event for m in merged], store)
+        global LAST_UNRESOLVED
         bad = getattr(enricher, "unresolved", 0)
-        if strict and (bad or not hasattr(enricher, "unresolved")):
+        LAST_UNRESOLVED = bad
+        # A few leftovers are posted as they are (and reported). A large share means the API is down or out of credit:
+        # then the whole post would look broken, so stop and alert instead.
+        limit = max(10, int(0.03 * len(merged)))
+        if strict and (not hasattr(enricher, "unresolved") or bad > limit):
             raise EnrichmentIncomplete(
-                f"{bad} events could not be translated/classified: {getattr(enricher, 'last_error', 'no ANTHROPIC_API_KEY')}")
+                f"{bad} of {len(merged)} events could not be translated/classified: "
+                f"{getattr(enricher, 'last_error', 'no ANTHROPIC_API_KEY')}")
     else:
         from .enrich import RuleEnricher
         RuleEnricher().enrich([m.event for m in merged], store)

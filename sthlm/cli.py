@@ -160,6 +160,8 @@ def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str 
         print(msg)
         alert_admin(msg)
         raise SystemExit(1)
+    if catalog.LAST_UNRESOLVED and not dry:
+        alert_admin(f"⚠️ {catalog.LAST_UNRESOLVED} events could not be translated this time and are posted with their original text.")
     build = {"daily": render.daily, "weekly": render.weekly}[kind]
     for audience, banner in AUDIENCES.items():
         mine = [m for m in merged if m.event.extra.get("audience", "fun") == audience]

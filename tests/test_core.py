@@ -275,3 +275,33 @@ def test_report_flags_a_missing_weekly_plan(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(catalog, "build", lambda *a, **k: [])
     cli.cmd_report({"db_path": "x", "window_days": 30}, send=False)
     assert "NOT posted yet" in capsys.readouterr().out
+
+
+def test_enrichment_retries_leftovers_and_tolerates_a_few(monkeypatch, tmp_path):
+    from sthlm import catalog, enrich
+    from sthlm.store import Store
+    monkeypatch.setattr(enrich.time, "sleep", lambda s: None)
+    calls = {"n": 0}
+
+    class Fake(enrich.LLMEnricher):
+        def __init__(self):
+            self.unresolved, self.last_error = 0, ""
+
+        def _call(self, chunk, desc_limit=350):
+            calls["n"] += 1
+            if calls["n"] == 1:                           # first attempt: the model skips the last event
+                return [self._ok(e) for e in chunk[:-1]] + [None]
+            return [self._ok(e) for e in chunk]
+
+        @staticmethod
+        def _ok(e):
+            return {"title_en": e.title, "summary_en": "s", "category": "music", "language": "en", "cost": "free",
+                    "score": 5, "evergreen": False, "is_event": True, "audience": "fun", "english_ok": True}
+
+        def _deep(self, events, store):
+            pass
+    st = Store(tmp_path / "t.sqlite")
+    events = [ev(f"E{i}") for i in range(5)]
+    f = Fake()
+    f.enrich(events, st)
+    assert f.unresolved == 0 and all(e.extra.get("summary_en") == "s" for e in events)

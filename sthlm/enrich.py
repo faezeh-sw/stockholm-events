@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import time
 
 from . import usage
 from .models import CATEGORIES, Event
@@ -144,15 +145,34 @@ class LLMEnricher(RuleEnricher):
                 mid = len(chunk) // 2
                 return run(chunk[:mid]) + run(chunk[mid:])
 
+        failed: list[Event] = []
         with ThreadPoolExecutor(6) as pool:        # API calls in parallel; SQLite writes stay on this thread
             for chunk, results in zip(chunks, pool.map(run, chunks)):
                 for ev, res in zip(chunk, results):
                     if res is None:
-                        self.unresolved += 1
+                        failed.append(ev)
                         continue
                     store.put_enrich(text_key(ev), res)
                     self._apply(ev, res)
                 store.commit()
+        # A busy API or a model that skipped an item is usually temporary: wait, then retry the leftovers in small batches.
+        for attempt in range(2):
+            if not failed:
+                break
+            log.warning("enrich: retrying %d events that failed (attempt %d)", len(failed), attempt + 1)
+            time.sleep(10 * (attempt + 1))
+            still: list[Event] = []
+            for i in range(0, len(failed), 3):
+                chunk = failed[i:i + 3]
+                for ev, res in zip(chunk, run(chunk)):
+                    if res is None:
+                        still.append(ev)
+                    else:
+                        store.put_enrich(text_key(ev), res)
+                        self._apply(ev, res)
+                store.commit()
+            failed = still
+        self.unresolved += len(failed)
         self._deep(events, store)
 
     # --- second pass: read the event's own page when language or price is still unknown -----------

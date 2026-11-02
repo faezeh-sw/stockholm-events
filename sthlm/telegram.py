@@ -9,6 +9,16 @@ import requests
 log = logging.getLogger(__name__)
 
 
+def _cfg() -> dict:
+    """Non-secret Telegram settings (group and topic ids) from config.yaml. Environment variables override them."""
+    try:
+        import yaml
+        from pathlib import Path
+        return (yaml.safe_load((Path(__file__).resolve().parent.parent / "config.yaml").read_text(encoding="utf-8")) or {}).get("telegram", {})
+    except Exception:
+        return {}
+
+
 class TelegramError(RuntimeError):
     pass
 
@@ -27,9 +37,10 @@ class Telegram:
             chat = os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
         elif test:
             chat = os.environ.get("TELEGRAM_TEST_CHANNEL_ID") or os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
-        elif os.environ.get("TELEGRAM_GROUP_ID"):
-            chat = os.environ["TELEGRAM_GROUP_ID"]
-            raw = os.environ.get(f"TELEGRAM_THREAD_{(audience or 'fun').upper()}")
+        elif os.environ.get("TELEGRAM_GROUP_ID") or _cfg().get("group_id"):
+            chat = os.environ.get("TELEGRAM_GROUP_ID") or str(_cfg()["group_id"])
+            aud = (audience or "fun").lower()
+            raw = os.environ.get(f"TELEGRAM_THREAD_{aud.upper()}") or _cfg().get(f"thread_{aud}")
             thread = int(raw) if raw else None
         else:
             chat = os.environ.get("TELEGRAM_CHANNEL_ID")
