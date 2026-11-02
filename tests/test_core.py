@@ -251,3 +251,27 @@ def test_render_pages_are_skipped_cleanly_when_no_browser(monkeypatch):
     win = (datetime(2026, 10, 27, tzinfo=TZ), datetime(2026, 11, 26, tzinfo=TZ))
     c = LlmPages({"pages": [{"name": "js", "url": "https://js.example/events", "render": True}]}, None, win, set(), None, client=object())
     assert list(c.fetch()) == []                       # logged and skipped, no crash
+
+
+def test_if_missing_skips_when_the_week_is_already_posted(tmp_path, monkeypatch, capsys):
+    from sthlm import catalog, cli
+    from sthlm.store import Store
+    st = Store(tmp_path / "t.sqlite")
+    for aud in ("fun", "professional"):
+        st.put_post(f"weekly-{aud}", "2026-11-09", [1], "h")
+    st.commit()
+    monkeypatch.setattr(cli, "Store", lambda path: st)
+    monkeypatch.setattr(catalog, "build", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not rebuild")))
+    cfg = {"db_path": "x", "window_days": 30}
+    cli.cmd_post(cfg, "weekly", dry=False, test=False, no_llm=True, on="2026-11-02", if_missing=True)
+    assert "already exists" in capsys.readouterr().out
+
+
+def test_report_flags_a_missing_weekly_plan(tmp_path, monkeypatch, capsys):
+    from sthlm import catalog, cli
+    from sthlm.store import Store
+    st = Store(tmp_path / "t.sqlite")
+    monkeypatch.setattr(cli, "Store", lambda path: st)
+    monkeypatch.setattr(catalog, "build", lambda *a, **k: [])
+    cli.cmd_report({"db_path": "x", "window_days": 30}, send=False)
+    assert "NOT posted yet" in capsys.readouterr().out

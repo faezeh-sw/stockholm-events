@@ -119,7 +119,15 @@ def sync_messages(tg, store, kind: str, key: str, msgs: list[str]) -> str:
 AUDIENCES = {"fun": "🎉 <b>FUN &amp; ENTERTAINMENT</b>", "professional": "💼 <b>PROFESSIONAL &amp; CAREER</b>"}
 
 
-def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str | None = None) -> None:
+def alert_admin(text: str) -> None:
+    from .telegram import Telegram
+    try:
+        Telegram.from_env(admin=True).send(text)
+    except Exception as exc:                 # never hide the original problem behind an alerting failure
+        print(f"(could not alert the admin: {exc})")
+
+
+def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str | None = None, if_missing: bool = False) -> None:
     from .telegram import Telegram
     store = Store(ROOT / cfg["db_path"])
     now = datetime.fromisoformat(on).replace(hour=7, tzinfo=TZ) if on else datetime.now(TZ)
@@ -140,18 +148,19 @@ def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str 
                 except Exception as exc:          # needs the bot's "pin messages" right
                     print("  could not pin (give the bot the Pin Messages permission):", exc)
         return
+    key = now.date().isoformat() if kind == "daily" else render.next_week_start(now.date()).isoformat()
+    prefix = "test-" if test else ""
+    if if_missing and all(store.get_post(f"{prefix}{kind}-{a}", key) for a in AUDIENCES):
+        print(f"{kind} post for {key} already exists: nothing to do")
+        return
     try:
         merged = catalog.build(store, s, e, enrich=not no_llm, strict=not (no_llm or dry))
     except catalog.EnrichmentIncomplete as exc:
         msg = f"🚫 Weekly post NOT sent: {exc}"
         print(msg)
-        try:
-            Telegram.from_env(admin=True).send(msg)
-        except Exception:
-            pass
+        alert_admin(msg)
         raise SystemExit(1)
     build = {"daily": render.daily, "weekly": render.weekly}[kind]
-    key = now.date().isoformat() if kind == "daily" else render.next_week_start(now.date()).isoformat()
     for audience, banner in AUDIENCES.items():
         mine = [m for m in merged if m.event.extra.get("audience", "fun") == audience]
         msgs = build(mine, now, site, audience=audience) if kind == "weekly" else build(mine, now, site)
@@ -162,12 +171,19 @@ def cmd_post(cfg: dict, kind: str, dry: bool, test: bool, no_llm: bool, on: str 
             for i, m in enumerate(msgs, 1):
                 print(f"\n----- {audience} message {i}/{len(msgs)} ({len(m)} chars) -----\n{m}")
             continue
-        tg = Telegram.from_env(test=test, audience=audience)
-        stored = f"{'test-' if test else ''}{kind}-{audience}"
-        if test and not store.get_post(stored, key):
-            # the test channel has no topics: separate the two sections with a banner message
-            tg.send(banner, silent=True)
-        print(stored, key, sync_messages(tg, store, stored, key, msgs))
+        stored = f"{prefix}{kind}-{audience}"
+        try:
+            tg = Telegram.from_env(test=test, audience=audience)
+            if test and not store.get_post(stored, key):
+                # the test channel has no topics: separate the two sections with a banner message
+                tg.send(banner, silent=True)
+            print(stored, key, sync_messages(tg, store, stored, key, msgs))
+        except Exception as exc:
+            msg = f"🚫 Posting {stored} for {key} FAILED: {type(exc).__name__}: {exc}"
+            print(msg)
+            usage.flush(store)
+            alert_admin(msg)
+            raise SystemExit(1)
     usage.flush(store)
 
 
@@ -179,7 +195,12 @@ def cmd_report(cfg: dict, send: bool) -> None:
     s, e = window(cfg)
     merged = catalog.build(store, s, e, enrich=False)
     lines = [f"<b>Stockholm Events — health</b> {datetime.now(TZ):%Y-%m-%d %H:%M}",
-             f"Unique upcoming events (30d): <b>{len(merged)}</b>", ""]
+             f"Unique upcoming events (30d): <b>{len(merged)}</b>"]
+    wk = render.next_week_start(datetime.now(TZ).date())
+    posted = [a for a in AUDIENCES if store.get_post(f"weekly-{a}", wk.isoformat())]
+    lines.append(f"{'✅' if len(posted) == len(AUDIENCES) else '⚠️'} Weekly plan for week of {wk:%d %b}: "
+                 + ("posted in both topics" if len(posted) == len(AUDIENCES) else f"NOT posted yet ({len(posted)}/{len(AUDIENCES)} topics)"))
+    lines.append("")
     for r in rows:
         lines.append(f"{'✅' if r['ok'] else '❌'} {r['source']}: {r['count']} events, {r['seconds']:.0f}s"
                      + (f" — {render.esc(r['error'])}" if r["error"] else ""))
@@ -212,13 +233,14 @@ def main() -> None:
     pp.add_argument("--dry-run", action="store_true")
     pp.add_argument("--test", action="store_true", help="send to the test channel instead of the public one")
     pp.add_argument("--no-llm", action="store_true")
+    pp.add_argument("--if-missing", action="store_true", help="catch-up mode: post only if this period has not been posted yet")
     pp.add_argument("--date", help="pretend today is this date (YYYY-MM-DD), for previews")
     args = ap.parse_args()
     cfg = load_config()
     if args.cmd == "collect":
         cmd_collect(cfg, args.only)
     elif args.cmd == "post":
-        cmd_post(cfg, args.kind, args.dry_run, args.test, args.no_llm, args.date)
+        cmd_post(cfg, args.kind, args.dry_run, args.test, args.no_llm, args.date, args.if_missing)
     elif args.cmd == "report":
         cmd_report(cfg, args.send)
     elif args.cmd == "stats":

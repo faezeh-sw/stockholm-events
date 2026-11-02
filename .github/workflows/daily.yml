@@ -2,7 +2,10 @@ name: events
 
 on:
   schedule:
-    - cron: "30 5 * * *"      # every day 05:30 UTC (06:30/07:30 Stockholm): refresh data; post only on Mondays
+    # GitHub often starts scheduled runs hours late, so we schedule twice a day at off-peak minutes.
+    # Every run is idempotent: collecting is cached, and posting is guarded (see the Post step).
+    - cron: "17 2 * * *"      # early morning UTC
+    - cron: "43 8 * * *"      # backup for when the first one is delayed or fails
   workflow_dispatch:
     inputs:
       post:
@@ -47,15 +50,24 @@ jobs:
       - name: Collect
         run: python -m sthlm.cli collect
 
-      - name: Post the weekly plan (Mondays, or when started by hand)
+      # Monday: post (or refresh) next week's plan. Any other day: catch up only if the plan was never posted,
+      # so a missed or failed Monday run is repaired by the next scheduled run instead of being lost.
+      - name: Post the weekly plan
         run: |
           KIND="${{ github.event.inputs.post }}"
-          if [ -z "$KIND" ] || [ "$KIND" = "none" ]; then
-            if [ "$(TZ=Europe/Stockholm date +%u)" = "1" ] && [ "${{ github.event_name }}" = "schedule" ]; then KIND=weekly; else KIND=none; fi
-          fi
           DRY=""
           [ "${{ github.event.inputs.dry_run }}" = "true" ] && DRY="--dry-run"
-          if [ "$KIND" != "none" ]; then python -m sthlm.cli post "$KIND" $DRY; else echo "no post today"; fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "$(TZ=Europe/Stockholm date +%u)" = "1" ]; then
+              python -m sthlm.cli post weekly
+            else
+              python -m sthlm.cli post weekly --if-missing
+            fi
+          elif [ "$KIND" = "weekly" ]; then
+            python -m sthlm.cli post weekly $DRY
+          else
+            echo "manual run without posting"
+          fi
 
       - name: Health report
         if: always()
